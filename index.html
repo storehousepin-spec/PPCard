@@ -9,18 +9,18 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>信用卡繳費資訊</title>
 <style>
-:root{--bg:#f3f5f2;--surface:#fff;--ink:#1d2b27;--muted:#66756f;--line:#d9e0dc;--accent:#0f6b55;--accent-ink:#fff;--warn:#b4432b;--soft:#e4efe9;
+:root{color-scheme:light;--bg:#f4f8ec;--surface:#fcfdf8;--ink:#263a22;--muted:#6a7d5d;--line:#d6e4c6;--accent:#3d7a38;--accent-ink:#fff;--warn:#b4532e;--soft:#e3efd2;
 box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121a17;--surface:#1b2622;--ink:#e6efeb;--muted:#92a39c;--line:#2e3d37;--accent:#4cc3a0;--accent-ink:#0b1713;--warn:#f08a70;--soft:#22332c}}
-:root[data-theme="dark"]{--bg:#121a17;--surface:#1b2622;--ink:#e6efeb;--muted:#92a39c;--line:#2e3d37;--accent:#4cc3a0;--accent-ink:#0b1713;--warn:#f08a70;--soft:#22332c}
+
+
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 "Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif}
+body{margin:0;background:linear-gradient(180deg,#e0edcc 0,var(--bg) 280px) no-repeat var(--bg);color:var(--ink);font:15px/1.6 "Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif}
 main{max-width:960px;margin:0 auto;padding:20px 16px 48px}
 h1{font-size:24px;margin:4px 0 2px;letter-spacing:.02em}
 h2{font-size:16px;margin:0 0 12px}
 .sub{color:var(--muted);margin:0 0 20px}
-section{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+section{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:16px;box-shadow:0 2px 0 rgba(61,122,56,.07)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:700px){.grid2{grid-template-columns:1fr}}
 .row{display:flex;gap:8px}
@@ -73,21 +73,30 @@ th:first-child,td:first-child{text-align:left}
 th{font-size:13px;color:var(--muted);font-weight:500}
 tfoot td{font-weight:700;border-bottom:0;background:var(--soft)}
 td.hl{color:var(--warn);font-weight:600}
+#chart{display:flex;gap:24px;align-items:center;flex-wrap:wrap}
+#chart svg{flex:none;max-width:100%}
+.lg{flex:1;min-width:200px}
+.lg div{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px}
+.lg div:last-child{border-bottom:0}
+.lg i{width:12px;height:12px;border-radius:3px;flex:none}
+.lg strong{font-weight:500}
+.lg span{margin-left:auto;text-align:right;white-space:nowrap}
+.lg em{font-style:normal;color:var(--muted);font-size:12px;margin-left:6px}
 </style>
 </head>
 <body>
 <main>
-<h1>信用卡繳費與分期試算</h1>
+<h1>🌿 信用卡繳費與分期試算</h1>
 <p class="sub">新增持卡人、信用卡公司與分期資料，自動算出利息金額與利率。</p>
 <div class="nav"><button id="navMain" class="on">分期管理</button><button id="navStats">統計</button><button id="navBackup">備份與還原</button></div>
 <div id="viewMain">
 
 <div class="grid2">
 <section><h2>持卡人</h2>
-<div class="row"><input id="pName" placeholder="輸入姓名，例如：王小明" maxlength="20"><button id="addP">新增</button></div>
+<div class="row"><input id="pName" maxlength="20"><button id="addP">新增</button></div>
 <div class="chips" id="pChips"></div></section>
 <section><h2>信用卡公司</h2>
-<div class="row"><input id="cName" placeholder="輸入發卡銀行，例如：國泰世華" maxlength="20"><button id="addC">新增</button></div>
+<div class="row"><input id="cName" maxlength="20"><button id="addC">新增</button></div>
 <div class="chips" id="cChips"></div></section>
 </div>
 
@@ -95,17 +104,16 @@ td.hl{color:var(--warn);font-weight:600}
 <div class="form">
 <div><label>持卡人</label><select id="fP"></select></div>
 <div><label>信用卡公司</label><select id="fC"></select></div>
-<div class="full"><label>消費項目</label><input id="fItem" placeholder="例如：iPhone、家電、旅遊"></div>
+<div class="full"><label>消費項目</label><input id="fItem"></div>
 <div><label>刷卡金額（本金）</label><input id="fPrin" type="number" min="0" inputmode="decimal"></div>
 <div><label>分期期數</label><input id="fN" type="number" min="1" inputmode="numeric"></div>
 <div><label>每期繳款金額</label><input id="fM" type="number" min="0" inputmode="decimal"></div>
-<div><label>一次性手續費（選填）</label><input id="fFee" type="number" min="0" inputmode="decimal" placeholder="0"></div>
-<div><label>已繳期數</label><input id="fPaid" type="number" min="0" inputmode="numeric" placeholder="0"></div>
-<div><label>每月繳款日</label><input id="fDay" type="number" min="1" max="31" inputmode="numeric" placeholder="例如 15"></div>
+<div><label>一次性手續費（選填）</label><input id="fFee" type="number" min="0" inputmode="decimal"></div>
+<div><label>已繳期數</label><input id="fPaid" type="number" min="0" inputmode="numeric"></div>
+<div><label>每月繳款日</label><input id="fDay" type="number" min="1" max="31" inputmode="numeric"></div>
 </div>
 <div class="preview" id="prev"></div>
 <div class="acts"><button id="addI">新增分期</button><span class="meta" id="err" style="color:var(--warn)"></span></div>
-<p class="note">利息總額 = 每期金額 × 期數 + 手續費 − 本金。年利率（APR）以每月現金流反推實質利率後 × 12 計算，通常高於銀行標示的「0.xx% 費率」。</p>
 </section>
 
 <section><h2>分期明細</h2>
@@ -117,13 +125,13 @@ td.hl{color:var(--warn);font-weight:600}
 
 <div id="viewBackup" hidden>
 <section><h2>備份與還原</h2>
-<p class="meta" style="margin:0 0 10px">換手機前先「複製備份」，存到備忘錄或傳給自己；新手機把內容貼在下方，按「貼上還原」即可。</p>
-<textarea id="bk" placeholder="備份內容會顯示在這裡；還原時請在這裡貼上備份內容" spellcheck="false"></textarea>
+<textarea id="bk" spellcheck="false"></textarea>
 <div class="acts"><button id="bkCopy">複製備份</button><button id="bkRestore">貼上還原</button><span class="meta" id="bkMsg"></span></div>
 </section>
 </div>
 
 <div id="viewStats" hidden>
+<section><h2>剩餘應繳金額占比</h2><div class="tabs" id="chTabs"></div><div id="chart"></div></section>
 <section><h2>持卡人統計</h2><div class="scroll" id="stPerson"></div></section>
 <section><h2>信用卡公司統計</h2><div class="scroll" id="stCard"></div></section>
 <section><h2>未繳清分期明細</h2><div class="scroll" id="stDetail"></div></section>
@@ -179,7 +187,7 @@ const num=id=>parseFloat($(id).value)||0;
 function preview(){
   const p=num("fPrin"),n=Math.floor(num("fN")),m=num("fM"),fee=num("fFee"),el=$("prev");
   el.textContent="";
-  if(!(p>0&&n>0&&m>0)){mk(el,"span","填入本金、期數與每期金額後，這裡會即時顯示利息試算。","meta");el.style.display="block";return}
+  if(!(p>0&&n>0&&m>0)){el.style.display="none";return}
   el.style.display="grid";
   const r=calc(p,n,m,fee);
   [["應繳總額","$"+fmt(r.total)],["利息金額","$"+fmt(r.interest)],["總利率",pct(r.rate)],["年利率 APR",pct(r.apr)]].forEach(([a,b])=>{const d=mk(el,"div",a);mk(d,"b",b)});
@@ -300,8 +308,37 @@ $("bkRestore").onclick=async()=>{
   }catch(e){bkMsg.textContent="備份內容格式不正確，請確認有完整複製。"}
 };
 
+let chBy="person";
+const COLORS=["#3d7a38","#c9a227","#8a5a3b","#6fb06a","#d1783f","#4f8f8a","#a3b86c","#7a5c8f"];
+function renderChart(){
+  const tabs=$("chTabs");tabs.textContent="";
+  [["person","持卡人"],["card","信用卡公司"]].forEach(([k,t])=>{const b=mk(tabs,"button",t);if(k===chBy)b.className="on";b.onclick=()=>{chBy=k;renderChart()}});
+  const keys=chBy==="person"?S.people:S.cards;
+  const data=keys.map(k=>({k,v:S.items.filter(i=>i[chBy]===k).reduce((s,i)=>s+(i.n-i.paid)*i.m,0)})).filter(d=>d.v>0).sort((a,b)=>b.v-a.v);
+  const box=$("chart");box.textContent="";
+  const total=data.reduce((s,d)=>s+d.v,0);
+  if(!total){mk(box,"div","目前沒有未繳金額。","empty");return}
+  const NS="http://www.w3.org/2000/svg";
+  const se=(p,t,a)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);p.appendChild(e);return e};
+  const svg=se(box,"svg",{viewBox:"0 0 200 200",width:200,height:200,role:"img"});
+  const R=70,C=2*Math.PI*R;let off=0;
+  data.forEach((d,i)=>{
+    const len=d.v/total*C,gap=data.length>1?Math.min(2,len*.2):0;
+    se(svg,"circle",{cx:100,cy:100,r:R,fill:"none",stroke:COLORS[i%COLORS.length],"stroke-width":34,"stroke-dasharray":(len-gap)+" "+(C-len+gap),"stroke-dashoffset":-off,transform:"rotate(-90 100 100)"});
+    off+=len;
+  });
+  const amt="$"+fmt(total);
+  const t1=se(svg,"text",{x:100,y:94,"text-anchor":"middle","font-size":12});t1.textContent="剩餘應繳";t1.style.fill="var(--muted)";
+  const t2=se(svg,"text",{x:100,y:116,"text-anchor":"middle","font-size":amt.length>9?14:18,"font-weight":700});t2.textContent=amt;t2.style.fill="var(--ink)";
+  const lg=mk(box,"div",null,"lg");
+  data.forEach((d,i)=>{
+    const r=mk(lg,"div");mk(r,"i").style.background=COLORS[i%COLORS.length];
+    mk(r,"strong",d.k);
+    const s=mk(r,"span","$"+fmt(d.v));mk(s,"em",(d.v/total*100).toFixed(1)+"%");
+  });
+}
 const _render=render;
-render=function(){_render();renderStats()};
+render=function(){_render();renderStats();renderChart()};
 render();
 </script>
 </body>
