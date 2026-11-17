@@ -36,9 +36,9 @@ button.ghost:hover{color:var(--warn);border-color:var(--warn)}
 .form{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 @media(max-width:700px){.form{grid-template-columns:1fr 1fr}}
 .form .full{grid-column:1/-1}
-.preview{margin-top:12px;padding:12px;border-radius:8px;background:var(--soft);display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:13px}
-@media(max-width:700px){.preview{grid-template-columns:1fr 1fr}}
-.preview b{display:block;font-size:18px}
+.preview{margin-top:12px;padding:12px;border-radius:8px;background:var(--soft);display:grid;grid-template-columns:repeat(5,1fr);gap:8px;font-size:13px}
+@media(max-width:700px){.preview{grid-template-columns:1fr 1fr 1fr}}
+.preview b{display:block;font-size:16px}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
 .tabs button{background:transparent;color:var(--ink);border:1px solid var(--line);padding:5px 12px;font-size:13px}
 .tabs button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
@@ -88,7 +88,7 @@ td.hl{color:var(--warn);font-weight:600}
 <main>
 <h1>🌿 信用卡繳費與分期試算</h1>
 <p class="sub">新增持卡人、信用卡公司與分期資料，自動算出利息金額與利率。</p>
-<div class="nav"><button id="navMain" class="on">分期管理</button><button id="navStats">統計</button><button id="navBackup">備份與還原</button></div>
+<div class="nav"><button id="navMain" class="on">帳單管理</button><button id="navStats">統計</button><button id="navBackup">備份與還原</button></div>
 <div id="viewMain">
 
 <div class="grid2">
@@ -100,7 +100,7 @@ td.hl{color:var(--warn);font-weight:600}
 <div class="chips" id="cChips"></div></section>
 </div>
 
-<section><h2>新增分期</h2>
+<section id="formSec"><h2 id="formTitle">帳單資訊新增</h2>
 <div class="form">
 <div><label>持卡人</label><select id="fP"></select></div>
 <div><label>信用卡公司</label><select id="fC"></select></div>
@@ -108,12 +108,12 @@ td.hl{color:var(--warn);font-weight:600}
 <div><label>刷卡金額（本金）</label><input id="fPrin" type="number" min="0" inputmode="decimal"></div>
 <div><label>分期期數</label><input id="fN" type="number" min="1" inputmode="numeric"></div>
 <div><label>每期繳款金額</label><input id="fM" type="number" min="0" inputmode="decimal"></div>
-<div><label>一次性手續費（選填）</label><input id="fFee" type="number" min="0" inputmode="decimal"></div>
+<div><label>總費用年百分率（%）</label><input id="fApr" type="number" min="0" step="any" inputmode="decimal"></div>
 <div><label>已繳期數</label><input id="fPaid" type="number" min="0" inputmode="numeric"></div>
 <div><label>每月繳款日</label><input id="fDay" type="number" min="1" max="31" inputmode="numeric"></div>
 </div>
 <div class="preview" id="prev"></div>
-<div class="acts"><button id="addI">新增分期</button><span class="meta" id="err" style="color:var(--warn)"></span></div>
+<div class="acts"><button id="addI">新增</button><button id="cancelI" class="ghost" hidden>取消修改</button><span class="meta" id="err" style="color:var(--warn)"></span></div>
 </section>
 
 <section><h2>分期明細</h2>
@@ -184,24 +184,49 @@ $("pName").onkeydown=e=>{if(e.key==="Enter")add("p")};
 $("cName").onkeydown=e=>{if(e.key==="Enter")add("c")};
 
 const num=id=>parseFloat($(id).value)||0;
-function preview(){
-  const p=num("fPrin"),n=Math.floor(num("fN")),m=num("fM"),fee=num("fFee"),el=$("prev");
-  el.textContent="";
-  if(!(p>0&&n>0&&m>0)){el.style.display="none";return}
-  el.style.display="grid";
-  const r=calc(p,n,m,fee);
-  [["應繳總額","$"+fmt(r.total)],["利息金額","$"+fmt(r.interest)],["總利率",pct(r.rate)],["年利率 APR",pct(r.apr)]].forEach(([a,b])=>{const d=mk(el,"div",a);mk(d,"b",b)});
+let editId=null;
+const pmt=(p,n,a)=>{const r=a/1200;return r>0?p*r/(1-Math.pow(1+r,-n)):p/n};
+function readForm(){
+  const p=num("fPrin"),n=Math.floor(num("fN")),mm=num("fM"),av=parseFloat($("fApr").value);
+  const apr=isNaN(av)?null:Math.max(0,av);
+  const old=editId&&S.items.find(x=>x.id===editId),fee=old?(old.fee||0):0;
+  const ok=p>0&&n>0&&(mm>0||apr!==null),auto=!(mm>0);
+  return{p,n,apr,auto,fee,ok,m:ok?(auto?pmt(p,n,apr):mm):0};
 }
-["fPrin","fN","fM","fFee"].forEach(id=>$(id).oninput=preview);
+function resetForm(){
+  editId=null;
+  ["fItem","fPrin","fN","fM","fApr","fPaid","fDay"].forEach(id=>$(id).value="");
+  $("addI").textContent="新增";$("cancelI").hidden=true;$("formTitle").textContent="帳單資訊新增";preview();
+}
+function startEdit(i){
+  editId=i.id;
+  $("fP").value=i.person;$("fC").value=i.card;$("fItem").value=i.name==="未命名消費"?"":i.name;
+  $("fPrin").value=i.prin;$("fN").value=i.n;$("fM").value=i.auto?"":i.m;$("fApr").value=i.apr==null?"":i.apr;
+  $("fPaid").value=i.paid||"";$("fDay").value=i.day||"";
+  $("addI").textContent="儲存修改";$("cancelI").hidden=false;$("formTitle").textContent="帳單資訊修改";
+  $("err").textContent="";preview();$("formSec").scrollIntoView({behavior:"smooth"});
+}
+$("cancelI").onclick=resetForm;
+function preview(){
+  const f=readForm(),p=f.p,n=f.n,m=f.m,fee=f.fee,el=$("prev");
+  el.textContent="";
+  if(!f.ok){el.style.display="none";return}
+  el.style.display="grid";
+  const r=calc(p,n,m,fee);if(f.apr!==null)r.apr=f.apr/100;
+  [["每期金額","$"+fmt(m)],["應繳總額","$"+fmt(r.total)],["利息金額","$"+fmt(r.interest)],["總利率",pct(r.rate)],["總費用年百分率",pct(r.apr)]].forEach(([a,b])=>{const d=mk(el,"div",a);mk(d,"b",b)});
+}
+["fPrin","fN","fM","fApr"].forEach(id=>$(id).oninput=preview);
 
 $("addI").onclick=()=>{
   const err=$("err");err.textContent="";
-  const p=num("fPrin"),n=Math.floor(num("fN")),m=num("fM");
+  const f=readForm(),p=f.p,n=f.n;
   if(!S.people.length||!S.cards.length){err.textContent="請先新增持卡人與信用卡公司。";return}
-  if(!(p>0&&n>0&&m>0)){err.textContent="本金、期數、每期金額都必須大於 0。";return}
+  if(!f.ok){err.textContent="請填寫本金、期數，以及每期金額或總費用年百分率。";return}
   const paid=Math.min(n,Math.max(0,Math.floor(num("fPaid"))));
-  S.items.push({id:uid(),person:$("fP").value,card:$("fC").value,name:$("fItem").value.trim()||"未命名消費",prin:p,n,m,fee:num("fFee"),paid,day:Math.min(31,Math.floor(num("fDay")))||0});
-  ["fItem","fPrin","fN","fM","fFee","fPaid","fDay"].forEach(id=>$(id).value="");
+  const rec={person:$("fP").value,card:$("fC").value,name:$("fItem").value.trim()||"未命名消費",prin:p,n:n,m:f.m,fee:f.fee,apr:f.apr,auto:f.auto,paid,day:Math.min(31,Math.floor(num("fDay")))||0};
+  const it=editId&&S.items.find(x=>x.id===editId);
+  if(it)Object.assign(it,rec);else S.items.push(Object.assign({id:uid()},rec));
+  resetForm();
   save();render();
 };
 
@@ -219,19 +244,20 @@ function render(){
   const list=$("list");list.textContent="";
   if(!items.length){mk(list,"div","還沒有分期資料。從上方「新增分期」開始。","empty");return}
   items.forEach(i=>{
-    const r=calc(i.prin,i.n,i.m,i.fee),done=i.paid>=i.n,box=mk(list,"div",null,"item");
+    const r=calc(i.prin,i.n,i.m,i.fee||0);if(i.apr!=null)r.apr=i.apr/100;const done=i.paid>=i.n,box=mk(list,"div",null,"item");
     const h=mk(box,"div",null,"head"),l=mk(h,"div");
     mk(l,"div",i.name,"title");
     mk(l,"div",i.person+"・"+i.card+(i.day?"・每月 "+i.day+" 日":""),"meta");
     mk(h,"div",done?"已繳清":"剩餘 "+(i.n-i.paid)+" 期 / $"+fmt((i.n-i.paid)*i.m),"meta");
     const g=mk(box,"div",null,"nums");
-    [["本金","$"+fmt(i.prin)],["每期","$"+fmt(i.m)+" × "+i.n],["利息金額","$"+fmt(r.interest)],["總利率",pct(r.rate)],["年利率 APR",pct(r.apr)]].forEach(([a,b],k)=>{const d=mk(g,"div",a);const x=mk(d,"b",b);if(k>=3)x.className="rate"});
+    [["本金","$"+fmt(i.prin)],["每期","$"+fmt(i.m)+" × "+i.n],["利息金額","$"+fmt(r.interest)],["總利率",pct(r.rate)],["總費用年百分率",pct(r.apr)]].forEach(([a,b],k)=>{const d=mk(g,"div",a);const x=mk(d,"b",b);if(k>=3)x.className="rate"});
     const bar=mk(box,"div",null,"bar"),f=mk(bar,"i");f.style.width=(i.paid/i.n*100)+"%";
     const a=mk(box,"div",null,"acts");
     mk(a,"span","已繳 "+i.paid+" / "+i.n+" 期","meta");
     const up=mk(a,"button","已繳 +1","ghost");up.disabled=done;up.onclick=()=>{i.paid++;save();render()};
     const dn=mk(a,"button","已繳 −1","ghost");dn.disabled=i.paid<=0;dn.onclick=()=>{i.paid--;save();render()};
-    const del=mk(a,"button","刪除","ghost");del.onclick=()=>{if(confirm("刪除「"+i.name+"」？")){S.items=S.items.filter(x=>x.id!==i.id);save();render()}};
+    const ed=mk(a,"button","編輯","ghost");ed.onclick=()=>startEdit(i);
+    const del=mk(a,"button","刪除","ghost");del.onclick=()=>{if(confirm("刪除「"+i.name+"」？")){if(editId===i.id)resetForm();S.items=S.items.filter(x=>x.id!==i.id);save();render()}};
   });
 }
 function setView(v){
@@ -300,7 +326,7 @@ $("bkRestore").onclick=async()=>{
     const n=x=>Number(x)||0;
     const next={
       people:d.people.map(String),cards:d.cards.map(String),
-      items:d.items.map(i=>({id:String(i.id||uid()),person:String(i.person),card:String(i.card),name:String(i.name||"未命名消費"),prin:n(i.prin),n:Math.max(1,Math.floor(n(i.n))),m:n(i.m),fee:n(i.fee),paid:Math.max(0,Math.floor(n(i.paid))),day:Math.floor(n(i.day))}))
+      items:d.items.map(i=>({id:String(i.id||uid()),person:String(i.person),card:String(i.card),name:String(i.name||"未命名消費"),prin:n(i.prin),n:Math.max(1,Math.floor(n(i.n))),m:n(i.m),fee:n(i.fee),apr:(i.apr==null||isNaN(Number(i.apr)))?null:Number(i.apr),auto:!!i.auto,paid:Math.max(0,Math.floor(n(i.paid))),day:Math.floor(n(i.day))}))
     };
     if(!confirm("還原會取代這支手機目前的所有資料（"+next.people.length+" 位持卡人、"+next.cards.length+" 家信用卡、"+next.items.length+" 筆分期），確定嗎？"))return;
     S=next;save();filter="all";render();
