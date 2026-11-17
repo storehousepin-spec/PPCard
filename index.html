@@ -73,6 +73,10 @@ th:first-child,td:first-child{text-align:left}
 th{font-size:13px;color:var(--muted);font-weight:500}
 tfoot td{font-weight:700;border-bottom:0;background:var(--soft)}
 td.hl{color:var(--warn);font-weight:600}
+.lim{display:flex;align-items:baseline;gap:8px;font-size:13px;color:var(--muted);margin-bottom:5px}
+.lim b{color:var(--ink);font-size:15px}
+.lim em{font-style:normal;margin-left:auto;text-align:right}
+.bar+.bar{margin-top:8px}
 #chart{display:flex;gap:24px;align-items:center;flex-wrap:wrap}
 #chart svg{flex:none;max-width:100%}
 .lg{flex:1;min-width:200px}
@@ -104,6 +108,7 @@ td.hl{color:var(--warn);font-weight:600}
 <div class="form">
 <div><label>持卡人</label><select id="fP"></select></div>
 <div><label>信用卡公司</label><select id="fC"></select></div>
+<div><label>信用卡額度</label><input id="fLimit" type="number" min="0" inputmode="decimal"></div>
 <div class="full"><label>消費項目</label><input id="fItem"></div>
 <div><label>刷卡金額（本金）</label><input id="fPrin" type="number" min="0" inputmode="decimal"></div>
 <div><label>分期期數</label><input id="fN" type="number" min="1" inputmode="numeric"></div>
@@ -132,6 +137,7 @@ td.hl{color:var(--warn);font-weight:600}
 
 <div id="viewStats" hidden>
 <section><h2>剩餘應繳金額占比</h2><div class="tabs" id="chTabs"></div><div id="chart"></div></section>
+<section><h2>信用卡額度統計</h2><div class="scroll" id="stLimit"></div></section>
 <section><h2>持卡人統計</h2><div class="scroll" id="stPerson"></div></section>
 <section><h2>信用卡公司統計</h2><div class="scroll" id="stCard"></div></section>
 <section><h2>未繳清分期明細</h2><div class="scroll" id="stDetail"></div></section>
@@ -140,7 +146,7 @@ td.hl{color:var(--warn);font-weight:600}
 
 <script>
 const KEY="ccTracker.v1";
-let S={people:[],cards:[],items:[]},filter="all";
+let S={people:[],cards:[],items:[],limits:{}},filter="all";
 try{const r=localStorage.getItem(KEY);if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
 try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
@@ -185,6 +191,23 @@ $("cName").onkeydown=e=>{if(e.key==="Enter")add("c")};
 
 const num=id=>parseFloat($(id).value)||0;
 let editId=null;
+const lim=(p,c)=>(S.limits&&S.limits[p+"|"+c])||0;
+const usedOf=(p,c)=>S.items.filter(i=>i.person===p&&i.card===c).reduce((s,i)=>s+(i.n-i.paid)*i.m,0);
+function syncLimit(){const v=lim($("fP").value,$("fC").value);$("fLimit").value=v>0?v:""}
+$("fP").onchange=syncLimit;$("fC").onchange=syncLimit;
+function renderLimit(){
+  const hd=["持卡人","信用卡","信用卡額度","剩餘應繳","剩餘可刷金額","使用率"];
+  const rows=[];let tl=0,tu=0,ta=0;
+  S.people.forEach(p=>S.cards.forEach(c=>{
+    const L=lim(p,c),has=S.items.some(i=>i.person===p&&i.card===c);
+    if(!L&&!has)return;
+    const u=usedOf(p,c);
+    if(L>0){tl+=L;tu+=u;ta+=L-u}
+    rows.push([p,c,L>0?"$"+fmt(L):"-","$"+fmt(u),L>0?"$"+fmt(L-u):"-",L>0?(u/L*100).toFixed(1)+"%":"-"]);
+  }));
+  table($("stLimit"),hd,rows,rows.length?["合計","","$"+fmt(tl),"$"+fmt(tu),"$"+fmt(ta),tl?(tu/tl*100).toFixed(1)+"%":"-"]:null);
+  document.querySelectorAll("#stLimit tr").forEach(tr=>{if(tr.children[1])tr.children[1].style.textAlign="left"});
+}
 const pmt=(p,n,a)=>{const r=a/1200;return r>0?p*r/(1-Math.pow(1+r,-n)):p/n};
 function readForm(){
   const p=num("fPrin"),n=Math.floor(num("fN")),mm=num("fM"),av=parseFloat($("fApr").value);
@@ -196,7 +219,7 @@ function readForm(){
 function resetForm(){
   editId=null;
   ["fItem","fPrin","fN","fM","fApr","fPaid","fDay"].forEach(id=>$(id).value="");
-  $("addI").textContent="新增";$("cancelI").hidden=true;$("formTitle").textContent="帳單資訊新增";preview();
+  $("addI").textContent="新增";$("cancelI").hidden=true;$("formTitle").textContent="帳單資訊新增";syncLimit();preview();
 }
 function startEdit(i){
   editId=i.id;
@@ -204,7 +227,7 @@ function startEdit(i){
   $("fPrin").value=i.prin;$("fN").value=i.n;$("fM").value=i.auto?"":i.m;$("fApr").value=i.apr==null?"":i.apr;
   $("fPaid").value=i.paid||"";$("fDay").value=i.day||"";
   $("addI").textContent="儲存修改";$("cancelI").hidden=false;$("formTitle").textContent="帳單資訊修改";
-  $("err").textContent="";preview();$("formSec").scrollIntoView({behavior:"smooth"});
+  $("err").textContent="";syncLimit();preview();$("formSec").scrollIntoView({behavior:"smooth"});
 }
 $("cancelI").onclick=resetForm;
 function preview(){
@@ -226,6 +249,8 @@ $("addI").onclick=()=>{
   const rec={person:$("fP").value,card:$("fC").value,name:$("fItem").value.trim()||"未命名消費",prin:p,n:n,m:f.m,fee:f.fee,apr:f.apr,auto:f.auto,paid,day:Math.min(31,Math.floor(num("fDay")))||0};
   const it=editId&&S.items.find(x=>x.id===editId);
   if(it)Object.assign(it,rec);else S.items.push(Object.assign({id:uid()},rec));
+  const lv=$("fLimit").value.trim();
+  if(lv!==""){const L=Math.max(0,parseFloat(lv)||0),k=rec.person+"|"+rec.card;if(L>0)S.limits[k]=L;else delete S.limits[k]}
   resetForm();
   save();render();
 };
@@ -251,6 +276,15 @@ function render(){
     mk(h,"div",done?"已繳清":"剩餘 "+(i.n-i.paid)+" 期 / $"+fmt((i.n-i.paid)*i.m),"meta");
     const g=mk(box,"div",null,"nums");
     [["本金","$"+fmt(i.prin)],["每期","$"+fmt(i.m)+" × "+i.n],["利息金額","$"+fmt(r.interest)],["總利率",pct(r.rate)],["總費用年百分率",pct(r.apr)]].forEach(([a,b],k)=>{const d=mk(g,"div",a);const x=mk(d,"b",b);if(k>=3)x.className="rate"});
+    const L=lim(i.person,i.card);
+    if(L>0){
+      const u=usedOf(i.person,i.card),av=L-u;
+      const lb=mk(box,"div",null,"lim");
+      mk(lb,"span","剩餘可刷金額");
+      const bv=mk(lb,"b","$"+fmt(av));if(av<0)bv.style.color="var(--warn)";
+      mk(lb,"em","額度 $"+fmt(L)+"・已用 "+Math.min(999,Math.round(u/L*100))+"%");
+      const lbar=mk(box,"div",null,"bar"),lf=mk(lbar,"i");lf.style.width=Math.min(100,u/L*100)+"%";lf.style.background=u/L>.8?"var(--warn)":"var(--accent)";
+    }
     const bar=mk(box,"div",null,"bar"),f=mk(bar,"i");f.style.width=(i.paid/i.n*100)+"%";
     const a=mk(box,"div",null,"acts");
     mk(a,"span","已繳 "+i.paid+" / "+i.n+" 期","meta");
@@ -326,6 +360,7 @@ $("bkRestore").onclick=async()=>{
     const n=x=>Number(x)||0;
     const next={
       people:d.people.map(String),cards:d.cards.map(String),
+      limits:Object.fromEntries(Object.entries(d.limits&&typeof d.limits==="object"?d.limits:{}).map(([k,v])=>[k,Number(v)||0]).filter(([k,v])=>v>0)),
       items:d.items.map(i=>({id:String(i.id||uid()),person:String(i.person),card:String(i.card),name:String(i.name||"未命名消費"),prin:n(i.prin),n:Math.max(1,Math.floor(n(i.n))),m:n(i.m),fee:n(i.fee),apr:(i.apr==null||isNaN(Number(i.apr)))?null:Number(i.apr),auto:!!i.auto,paid:Math.max(0,Math.floor(n(i.paid))),day:Math.floor(n(i.day))}))
     };
     if(!confirm("還原會取代這支手機目前的所有資料（"+next.people.length+" 位持卡人、"+next.cards.length+" 家信用卡、"+next.items.length+" 筆分期），確定嗎？"))return;
@@ -364,8 +399,8 @@ function renderChart(){
   });
 }
 const _render=render;
-render=function(){_render();renderStats();renderChart()};
-render();
+render=function(){_render();renderStats();renderChart();renderLimit()};
+render();syncLimit();
 </script>
 </body>
 </html>
